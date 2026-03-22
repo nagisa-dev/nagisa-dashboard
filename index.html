@@ -474,7 +474,8 @@ async function fetchTodaySchedule(token) {
     );
     if (!res.ok) throw new Error('fetch failed');
     const meta = await res.json();
-    const json = JSON.parse(atob(meta.content.replace(/\n/g, '')));
+    const bytes = Uint8Array.from(atob(meta.content.replace(/\n/g, '')), c => c.charCodeAt(0));
+    const json = JSON.parse(new TextDecoder('utf-8').decode(bytes));
     renderTimeline(json);
   } catch (e) {
     view.innerHTML = '<div class="today-empty">スケジュールが見つかりません。<br>「おはよう」と話しかけて生成してください。</div>';
