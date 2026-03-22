@@ -517,7 +517,7 @@ function renderTimeline(data) {
       ? `<div class="tl-check"><span class="tl-check-mark">✓</span></div>` : '';
 
     html += `
-      <div class="tl-item${isDone ? ' done' : ''}" data-index="${i}" data-type="${item.type}">
+      <div class="tl-item${isDone ? ' done' : ''}" data-index="${i}" data-type="${item.type}" data-issue="${item.issue || ''}">
         <div class="tl-time">${item.start || ''}</div>
         <div class="tl-icon">${icon}</div>
         <div class="tl-body">
@@ -546,14 +546,69 @@ function renderTimeline(data) {
 
   // タスクのチェックトグル
   view.querySelectorAll('.tl-item[data-type="task"]').forEach(el => {
-    el.addEventListener('click', () => {
-      const idx = parseInt(el.dataset.index);
-      if (doneSet.has(idx)) doneSet.delete(idx);
-      else doneSet.add(idx);
+    el.addEventListener('click', async () => {
+      const idx    = parseInt(el.dataset.index);
+      const issue  = parseInt(el.dataset.issue);
+      const isDone = doneSet.has(idx);
+      const check  = el.querySelector('.tl-check');
+
+      // ローカル状態を先に更新（楽観的UI）
+      if (isDone) doneSet.delete(idx); else doneSet.add(idx);
       localStorage.setItem(doneKey, JSON.stringify([...doneSet]));
       el.classList.toggle('done');
+
+      // issueがあればGitHub Projectsも更新
+      if (issue) {
+        check.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin:auto"></div>';
+        const DONE_ID     = 'b43841e5';
+        const TODO_ID     = 'ac98ce85';
+        const newOptId    = isDone ? TODO_ID : DONE_ID;
+        const projectItem = allItems.find(it => it.content?.number === issue);
+        if (projectItem) {
+          const ok = await updateStatusSilent(projectItem, newOptId);
+          check.innerHTML = '<span class="tl-check-mark">✓</span>';
+          if (!ok) {
+            // 失敗したらロールバック
+            if (isDone) doneSet.add(idx); else doneSet.delete(idx);
+            localStorage.setItem(doneKey, JSON.stringify([...doneSet]));
+            el.classList.toggle('done');
+          }
+        } else {
+          check.innerHTML = '<span class="tl-check-mark">✓</span>';
+        }
+      }
     });
   });
+}
+
+// ── ステータス更新（サイレント・今日ビュー用） ──
+async function updateStatusSilent(item, newOptId) {
+  const token = localStorage.getItem('gh_pat');
+  if (!token || !projectId || !statusFieldId) return false;
+  const mutation = `
+    mutation {
+      updateProjectV2ItemFieldValue(input: {
+        projectId: "${projectId}"
+        itemId: "${item.id}"
+        fieldId: "${statusFieldId}"
+        value: { singleSelectOptionId: "${newOptId}" }
+      }) { projectV2Item { id } }
+    }`;
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mutation }),
+    });
+    const data = await res.json();
+    if (!data.errors) {
+      // ローカルのallItemsも更新してボードに即反映
+      const fv = item.fieldValues.nodes.find(f => f.field?.name === 'Status');
+      if (fv) fv.optionId = newOptId;
+      return true;
+    }
+    return false;
+  } catch { return false; }
 }
 
 function timeToMin(t) {
