@@ -338,7 +338,10 @@
   <div class="board" id="board"></div>
 
   <!-- 今日ビュー -->
-  <div id="today-view"></div>
+  <div id="today-view">
+    <div id="today-tasks-section"></div>
+    <div id="today-timeline-section"></div>
+  </div>
 
   <button class="logout-btn" id="logout-btn">ログアウト（トークンを削除）</button>
 </div>
@@ -413,6 +416,7 @@ function showMain(token) {
   document.getElementById('bottom-nav').classList.add('visible');
   switchPage('today');
   fetchTodaySchedule(token);
+  fetchTomorrowTasks(token);
   fetchData(token);
 }
 
@@ -462,9 +466,55 @@ document.getElementById('login-btn').addEventListener('click', async () => {
   }
 });
 
+// ── 今日のタスク取得（今日ビュー上部） ──
+async function fetchTomorrowTasks(token) {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const res = await fetch(
+      'https://api.github.com/repos/nagisa-dev/furuta-database/contents/output/tomorrow-tasks.json',
+      { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    if (!res.ok) throw new Error('fetch failed');
+    const meta = await res.json();
+    const bytes = Uint8Array.from(atob(meta.content.replace(/\n/g, '')), c => c.charCodeAt(0));
+    const json = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+    if (json.date === today) renderTodayTasks(json);
+  } catch (e) { /* タスクなければ上部は空のまま */ }
+}
+
+// ── 今日のタスク描画（今日ビュー上部） ──
+function renderTodayTasks(data) {
+  const section = document.getElementById('today-tasks-section');
+  const doneKey = `today_tasks_done_${data.date}`;
+  let doneSet = new Set(JSON.parse(localStorage.getItem(doneKey) || '[]'));
+
+  let html = '<div style="padding:16px 16px 0">';
+  html += '<div style="font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">今日やること</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+  data.tasks.forEach((task, i) => {
+    const done = doneSet.has(i);
+    html += `<div class="tl-item${done ? ' done' : ''}" data-tidx="${i}" style="cursor:pointer;">
+      <div class="tl-icon">◻</div>
+      <div class="tl-body"><div class="tl-title">${task.title}</div></div>
+      <div class="tl-check"><span class="tl-check-mark">✓</span></div>
+    </div>`;
+  });
+  html += '</div></div>';
+  section.innerHTML = html;
+
+  section.querySelectorAll('.tl-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.tidx);
+      if (doneSet.has(idx)) doneSet.delete(idx); else doneSet.add(idx);
+      localStorage.setItem(doneKey, JSON.stringify([...doneSet]));
+      el.classList.toggle('done');
+    });
+  });
+}
+
 // ── 今日スケジュール取得 ──
 async function fetchTodaySchedule(token) {
-  const view = document.getElementById('today-view');
+  const view = document.getElementById('today-timeline-section');
   view.innerHTML = '<div id="loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:40dvh;gap:12px;color:var(--muted);font-size:14px;"><div class="spinner"></div><span>スケジュール読み込み中...</span></div>';
 
   try {
@@ -484,7 +534,7 @@ async function fetchTodaySchedule(token) {
 
 // ── タイムライン描画 ──
 function renderTimeline(data) {
-  const view = document.getElementById('today-view');
+  const view = document.getElementById('today-timeline-section');
   const today = new Date().toISOString().slice(0, 10);
   const doneKey = `schedule_done_${data.date}`;
   let doneSet = new Set(JSON.parse(localStorage.getItem(doneKey) || '[]'));
