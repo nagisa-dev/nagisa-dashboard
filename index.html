@@ -375,12 +375,9 @@
       cursor: pointer;
     }
     .sheet-close-btn {
-      position: absolute; top: 12px; right: 12px;
-      width: 32px; height: 32px; border-radius: 50%;
-      background: var(--bg); border: 1px solid var(--border);
-      color: var(--text); font-size: 20px; line-height: 1;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; padding: 0;
+      display: block; width: 100%; padding: 12px; background: none;
+      border: 1px solid var(--border); border-radius: 10px;
+      font-size: 14px; color: var(--muted); cursor: pointer; text-align: center;
     }
     .sheet-close-btn:active { opacity: .6; }
     .sheet-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; line-height: 1.4; }
@@ -652,7 +649,6 @@
 <!-- ボトムシート（ボード用） -->
 <div id="sheet-overlay"></div>
 <div id="bottom-sheet">
-  <button class="sheet-close-btn" id="sheet-close-btn" aria-label="閉じる">×</button>
   <div class="sheet-handle" id="sheet-handle"></div>
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-num" id="sheet-num"></div>
@@ -670,7 +666,7 @@
 
   <div class="sheet-section-label">ステータスを変更</div>
   <div class="status-btns" id="status-btns"></div>
-  <button class="sheet-open-btn" id="sheet-open-btn">GitHubで開く ↗</button>
+  <button class="sheet-close-btn" id="sheet-close-btn">閉じる</button>
   <button class="sheet-delete-btn" id="sheet-delete-btn">このIssueを削除</button>
 </div>
 
@@ -1565,7 +1561,6 @@ function openSheet(item, currentOptId, kind = 'task') {
 
   document.getElementById('sheet-title').textContent = item.content.title;
   document.getElementById('sheet-num').textContent = `#${item.content.number}`;
-  document.getElementById('sheet-open-btn').onclick = () => window.open(item.content.url, '_blank');
 
   // 本文セクション
   originalBody = item.content.body || '';
