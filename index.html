@@ -370,9 +370,19 @@
     }
     #bottom-sheet.open { transform: translateY(0); }
     .sheet-handle {
-      width: 36px; height: 4px; background: var(--border);
-      border-radius: 2px; margin: 0 auto 16px;
+      width: 48px; height: 5px; background: var(--border);
+      border-radius: 3px; margin: 0 auto 16px;
+      cursor: pointer;
     }
+    .sheet-close-btn {
+      position: absolute; top: 12px; right: 12px;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-size: 20px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0;
+    }
+    .sheet-close-btn:active { opacity: .6; }
     .sheet-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; line-height: 1.4; }
     .sheet-num { font-size: 12px; color: var(--muted); font-family: monospace; margin-bottom: 16px; }
     .sheet-section-label {
@@ -642,7 +652,8 @@
 <!-- ボトムシート（ボード用） -->
 <div id="sheet-overlay"></div>
 <div id="bottom-sheet">
-  <div class="sheet-handle"></div>
+  <button class="sheet-close-btn" id="sheet-close-btn" aria-label="閉じる">×</button>
+  <div class="sheet-handle" id="sheet-handle"></div>
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-num" id="sheet-num"></div>
 
@@ -1599,6 +1610,8 @@ function closeSheet() {
   exitEditMode();
 }
 document.getElementById('sheet-overlay').addEventListener('click', closeSheet);
+document.getElementById('sheet-close-btn').addEventListener('click', closeSheet);
+document.getElementById('sheet-handle').addEventListener('click', closeSheet);
 
 // ── 本文の編集モード切替 ──
 function enterEditMode() {
