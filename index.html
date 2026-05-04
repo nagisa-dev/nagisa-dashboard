@@ -1891,6 +1891,32 @@ document.getElementById('add-submit-btn').addEventListener('click', async () => 
   }
 });
 
+// ネタ帖用テンプレ（/write-now Phase 2 の調査・ドラフト品質を上げるための事前情報）
+const NOTE_TEMPLATE = `## なぜこの記事を書きたいか・目的
+<!-- きっかけ・問題意識・誰のため/何のために書くか -->
+
+
+## 記事の中心メッセージ（1〜2文）
+<!-- 読者に1番伝えたいこと -->
+
+
+## 想定読者
+<!-- 誰がどんな状況で読む？ -->
+
+
+## 読後にどうなってほしい
+<!-- 行動・気持ちの変化 -->
+
+
+## 自分の体験・具体例
+<!-- 核になるエピソード・データ・観察 -->
+
+
+## 参考にしたい情報
+<!-- 書籍・記事・人の発言・概念。なければ空欄 -->
+
+`;
+
 // Issue 作成 + Project追加 + Due Date設定
 async function createIssueForCurrentTab(title, domainJp, dueCode) {
   const token = localStorage.getItem('gh_pat');
@@ -1898,6 +1924,7 @@ async function createIssueForCurrentTab(title, domainJp, dueCode) {
 
   // 1. Issue 作成（REST API）
   const labelName = `domain:${domainJp}`;
+  const body = currentPage === 'note' ? NOTE_TEMPLATE : '';
   const issueRes = await fetch('https://api.github.com/repos/nagisa-dev/furuta-database/issues', {
     method: 'POST',
     headers: {
@@ -1905,7 +1932,7 @@ async function createIssueForCurrentTab(title, domainJp, dueCode) {
       'Accept': 'application/vnd.github+json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ title, body: '', labels: [labelName] }),
+    body: JSON.stringify({ title, body, labels: [labelName] }),
   });
   if (!issueRes.ok) throw new Error(`Issue作成失敗 (${issueRes.status})`);
   const issueData = await issueRes.json();
