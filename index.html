@@ -1982,6 +1982,27 @@ async function createIssueForCurrentTab(title, domainJp, dueCode) {
     });
   }
 
+  // 5. ネタ帖は Status=Stock を設定（追加直後の見えなくなり防止）
+  if (currentPage === 'note' && noteStatusFieldId) {
+    const stockOpt = (noteStatusOptions || []).find(o => o.name === 'Stock');
+    if (stockOpt) {
+      const stockMutation = `
+        mutation {
+          updateProjectV2ItemFieldValue(input: {
+            projectId: "${pid}"
+            itemId: "${itemId}"
+            fieldId: "${noteStatusFieldId}"
+            value: { singleSelectOptionId: "${stockOpt.id}" }
+          }) { projectV2Item { id } }
+        }`;
+      await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: stockMutation }),
+      });
+    }
+  }
+
   return { issueNumber, itemId };
 }
 
