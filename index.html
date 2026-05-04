@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.svg">
   <title>nagisa dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -126,15 +127,38 @@
     .col-empty { padding: 16px; text-align: center; font-size: 13px; color: var(--muted); }
     .item-card {
       padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border);
-      background: var(--bg); cursor: pointer; transition: border-color .15s;
+      background: var(--bg); cursor: pointer; transition: border-color .15s, opacity .25s, transform .25s;
+      display: flex; align-items: flex-start; gap: 10px;
     }
     .item-card:active { opacity: .7; }
+    .item-card.completing { opacity: 0; transform: translateX(20px); pointer-events: none; }
+    .item-card.dragging { opacity: .5; }
+    .item-check {
+      flex-shrink: 0; width: 20px; height: 20px;
+      border: 1.6px solid var(--border); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 2px; transition: all .15s; cursor: pointer;
+    }
+    .item-check:active { transform: scale(.85); }
+    .item-check.checked {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .item-check-mark { display: none; font-size: 11px; color: #fff; line-height: 1; }
+    .item-check.checked .item-check-mark { display: block; }
+    .item-check .spinner { width: 12px; height: 12px; border-width: 2px; }
+    .item-body { flex: 1; min-width: 0; }
     .item-title { font-size: 14px; line-height: 1.5; font-weight: 500; }
     .item-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
     .item-num { font-size: 11px; color: var(--muted); font-family: monospace; }
+    .item-due { font-size: 11px; color: var(--muted); font-weight: 500; }
+    .item-due.overdue { color: #dc2626; font-weight: 700; }
+    .item-due.today   { color: var(--accent); font-weight: 700; }
     .item-label {
       font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 500;
     }
+    .col-items.drag-over { background: rgba(34,197,94,.05); }
+    .sortable-ghost { opacity: 0; }
+    .sortable-chosen { transform: scale(1.02); }
 
     /* ── 今日ビュー ── */
     #today-view { padding: 16px; display: none; }
@@ -211,6 +235,85 @@
     .today-empty {
       text-align: center; color: var(--muted); font-size: 14px;
       padding: 48px 16px; line-height: 1.8;
+    }
+
+    /* ── リマインダービュー（Tasks） ── */
+    #tasks-view { padding: 16px; display: none; }
+
+    .tasks-section {
+      margin-bottom: 18px;
+    }
+    .tasks-section-header {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 0 4px 8px;
+      font-size: 13px; font-weight: 600;
+      color: var(--muted); letter-spacing: .04em;
+    }
+    .tasks-section-header.overdue { color: #dc2626; }
+    .tasks-section-header.today   { color: var(--accent); }
+    .tasks-section-count {
+      font-size: 11px; font-weight: 500; color: var(--muted);
+    }
+
+    .task-list {
+      display: flex; flex-direction: column;
+      background: var(--card); border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .task-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: opacity .25s, transform .25s;
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-item:active { opacity: .65; }
+    .task-item.completing {
+      opacity: 0; transform: translateX(20px);
+      pointer-events: none;
+    }
+
+    .task-check {
+      flex-shrink: 0; width: 22px; height: 22px;
+      border: 1.8px solid var(--border); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 1px; transition: all .15s;
+      cursor: pointer;
+    }
+    .task-check:active { transform: scale(.85); }
+    .task-check.checked {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .task-check-mark {
+      display: none; font-size: 12px; color: #fff; line-height: 1;
+    }
+    .task-check.checked .task-check-mark { display: block; }
+    .task-check .spinner {
+      width: 14px; height: 14px; border-width: 2px;
+    }
+
+    .task-body { flex: 1; min-width: 0; }
+    .task-title { font-size: 14px; line-height: 1.5; font-weight: 500; }
+    .task-meta {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 5px; flex-wrap: wrap;
+    }
+    .task-num {
+      font-size: 11px; color: var(--muted); font-family: monospace;
+    }
+    .task-due {
+      font-size: 11px; color: var(--muted);
+    }
+    .task-due.overdue { color: #dc2626; font-weight: 600; }
+    .task-due.today   { color: var(--accent); font-weight: 600; }
+    .task-label {
+      font-size: 11px; padding: 1px 7px; border-radius: 8px; font-weight: 500;
+    }
+
+    .tasks-empty {
+      text-align: center; color: var(--muted); font-size: 13px;
+      padding: 32px 16px; line-height: 1.7;
     }
 
     /* ── ローディング ── */
@@ -298,6 +401,144 @@
       display: flex; align-items: center; justify-content: center;
       border-radius: 20px 20px 0 0; font-size: 14px; color: var(--accent); gap: 8px;
     }
+
+    /* ── 本文セクション（ボトムシート内） ── */
+    #sheet-body-section { margin-bottom: 16px; }
+    .sheet-body-display {
+      white-space: pre-wrap;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 240px;
+      overflow-y: auto;
+      background: var(--bg);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      word-break: break-word;
+      color: var(--text);
+    }
+    .sheet-body-display.empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+    .sheet-body-editor {
+      width: 100%;
+      min-height: 240px;
+      padding: 12px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1.5px solid var(--accent);
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      margin-bottom: 8px;
+    }
+    .sheet-body-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .sheet-body-btn {
+      flex: 1;
+      padding: 9px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .sheet-body-btn.primary {
+      background: var(--accent); color: #fff; border-color: var(--accent);
+    }
+    .sheet-body-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .sheet-delete-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: rgba(220,38,38,.1);
+      color: #f87171;
+      border: 1px solid rgba(220,38,38,.3);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .sheet-delete-btn:active { opacity: .7; }
+
+    /* ── 追加 FAB ── */
+    .add-fab {
+      position: fixed; right: 20px; bottom: 88px;
+      width: 56px; height: 56px;
+      border-radius: 50%; border: none;
+      background: var(--accent); color: #fff;
+      font-size: 28px; font-weight: 300; line-height: 1;
+      box-shadow: 0 6px 16px rgba(0,0,0,.4);
+      cursor: pointer; z-index: 50;
+      display: none;
+    }
+    .add-fab.visible { display: flex; align-items: center; justify-content: center; }
+    .add-fab:active { transform: scale(.92); }
+
+    /* ── 追加フォーム（ボトムシート） ── */
+    #add-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--card); border-radius: 20px 20px 0 0;
+      padding: 20px 16px 32px; z-index: 101;
+      transform: translateY(100%); transition: transform .25s ease;
+      max-height: 85vh; overflow-y: auto;
+    }
+    #add-sheet.open { transform: translateY(0); }
+    .add-sheet-title {
+      font-size: 16px; font-weight: 700; margin-bottom: 4px;
+    }
+    .add-sheet-sub {
+      font-size: 12px; color: var(--muted); margin-bottom: 16px;
+    }
+    .add-form-label {
+      font-size: 11px; color: var(--muted); font-weight: 600;
+      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px;
+      display: block;
+    }
+    .add-form-input {
+      width: 100%; padding: 12px 14px;
+      background: var(--bg); color: var(--text);
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; outline: none; margin-bottom: 14px;
+      font-family: inherit;
+    }
+    .add-form-input:focus { border-color: var(--accent); }
+    .add-choice-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+      margin-bottom: 14px;
+    }
+    .add-choice-grid.due { grid-template-columns: repeat(3, 1fr); }
+    .add-choice-btn {
+      padding: 10px 8px; border-radius: 8px;
+      border: 1.5px solid var(--border); background: var(--bg); color: var(--text);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: all .15s;
+    }
+    .add-choice-btn.selected {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+    .add-submit-btn {
+      width: 100%; padding: 14px; margin-top: 8px;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 600;
+      cursor: pointer;
+    }
+    .add-submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .add-cancel-btn {
+      width: 100%; padding: 12px; margin-top: 8px;
+      background: none; color: var(--muted); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 13px; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -322,10 +563,10 @@
     <!-- フィルタータブ（ボードビュー時のみ表示） -->
     <div class="filter-tabs" id="filter-tabs">
       <button class="tab active" data-label="">すべて</button>
-      <button class="tab" data-label="domain:プロポーズ">💍 プロポーズ</button>
       <button class="tab" data-label="domain:仕事">💼 仕事</button>
       <button class="tab" data-label="domain:生活">🏠 生活</button>
       <button class="tab" data-label="domain:作る">🛠 作る</button>
+      <button class="tab" data-label="domain:学ぶ">📚 学ぶ</button>
     </div>
   </header>
 
@@ -337,26 +578,66 @@
   <!-- ボードビュー -->
   <div class="board" id="board"></div>
 
-  <!-- 今日ビュー -->
-  <div id="today-view">
-    <div id="today-tasks-section"></div>
-    <div id="today-timeline-section"></div>
-  </div>
+  <!-- ネタ帖ビュー -->
+  <div id="note-view" style="display:none;"></div>
+
+  <!-- リサーチビュー -->
+  <div id="research-view" style="display:none;"></div>
 
   <button class="logout-btn" id="logout-btn">ログアウト（トークンを削除）</button>
 </div>
 
 <!-- ボトムナビ -->
 <nav class="bottom-nav" id="bottom-nav">
-  <button class="nav-btn active" id="nav-today" data-page="today">
-    <span class="nav-icon">☀️</span>
-    <span class="nav-label">今日</span>
-  </button>
-  <button class="nav-btn" id="nav-board" data-page="board">
+  <button class="nav-btn active" id="nav-board" data-page="board">
     <span class="nav-icon">📋</span>
-    <span class="nav-label">ボード</span>
+    <span class="nav-label">タスク</span>
+  </button>
+  <button class="nav-btn" id="nav-note" data-page="note">
+    <span class="nav-icon">📝</span>
+    <span class="nav-label">ネタ帖</span>
+  </button>
+  <button class="nav-btn" id="nav-research" data-page="research">
+    <span class="nav-icon">🔍</span>
+    <span class="nav-label">リサーチ</span>
   </button>
 </nav>
+
+<!-- 追加 FAB -->
+<button class="add-fab" id="add-fab">+</button>
+
+<!-- 追加フォーム（ボトムシート） -->
+<div id="add-sheet">
+  <div class="sheet-handle"></div>
+  <div class="add-sheet-title" id="add-sheet-title">タスクを追加</div>
+  <div class="add-sheet-sub" id="add-sheet-sub"></div>
+
+  <label class="add-form-label">タイトル</label>
+  <input type="text" class="add-form-input" id="add-title" placeholder="タスク名を入力">
+
+  <label class="add-form-label">domain</label>
+  <div class="add-choice-grid">
+    <button class="add-choice-btn" data-domain="仕事">💼 仕事</button>
+    <button class="add-choice-btn" data-domain="生活">🏠 生活</button>
+    <button class="add-choice-btn" data-domain="作る">🛠 作る</button>
+    <button class="add-choice-btn" data-domain="学ぶ">📚 学ぶ</button>
+  </div>
+
+  <div id="add-due-section">
+    <label class="add-form-label">期限</label>
+    <div class="add-choice-grid due">
+      <button class="add-choice-btn" data-due="today">今日</button>
+      <button class="add-choice-btn" data-due="1week">1週間</button>
+      <button class="add-choice-btn" data-due="2week">2週間</button>
+      <button class="add-choice-btn" data-due="1month">1ヶ月</button>
+      <button class="add-choice-btn" data-due="someday">いつか</button>
+      <button class="add-choice-btn" data-due="">なし</button>
+    </div>
+  </div>
+
+  <button class="add-submit-btn" id="add-submit-btn">追加</button>
+  <button class="add-cancel-btn" id="add-cancel-btn">キャンセル</button>
+</div>
 
 <!-- ボトムシート（ボード用） -->
 <div id="sheet-overlay"></div>
@@ -364,9 +645,22 @@
   <div class="sheet-handle"></div>
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-num" id="sheet-num"></div>
+
+  <div id="sheet-body-section">
+    <div class="sheet-section-label">本文</div>
+    <div id="sheet-body-display" class="sheet-body-display"></div>
+    <textarea id="sheet-body-editor" class="sheet-body-editor" style="display:none;"></textarea>
+    <div class="sheet-body-actions">
+      <button id="sheet-body-edit-btn" class="sheet-body-btn">編集</button>
+      <button id="sheet-body-save-btn" class="sheet-body-btn primary" style="display:none;">保存</button>
+      <button id="sheet-body-cancel-btn" class="sheet-body-btn" style="display:none;">キャンセル</button>
+    </div>
+  </div>
+
   <div class="sheet-section-label">ステータスを変更</div>
   <div class="status-btns" id="status-btns"></div>
   <button class="sheet-open-btn" id="sheet-open-btn">GitHubで開く ↗</button>
+  <button class="sheet-delete-btn" id="sheet-delete-btn">このIssueを削除</button>
 </div>
 
 <script>
@@ -376,13 +670,16 @@ const COLUMNS = [
   { id: 'dc287443', name: 'Pending',        dot: '#f59e0b', label: '待ち' },
   { id: '894f06ed', name: 'In Progress',    dot: '#f97316', label: '作業中' },
   { id: 'b43841e5', name: 'Done',           dot: '#16A34A', label: '完了' },
+  { id: 'e05d7121', name: 'Someday',        dot: '#9ca3af', label: 'いつか' },
 ];
 
+const DONE_OPTION_ID = 'b43841e5';
+
 const LABEL_COLORS = {
-  'domain:プロポーズ': { bg: 'rgba(157,23,77,.2)',  color: '#f9a8d4' },
   'domain:仕事':       { bg: 'rgba(30,64,175,.2)',  color: '#93c5fd' },
   'domain:生活':       { bg: 'rgba(6,95,70,.2)',    color: '#6ee7b7' },
   'domain:作る':       { bg: 'rgba(91,33,182,.2)',  color: '#c4b5fd' },
+  'domain:学ぶ':       { bg: 'rgba(234,88,12,.2)',  color: '#fdba74' },
 };
 
 const SCHEDULE_LABEL_COLORS = {
@@ -393,11 +690,22 @@ const SCHEDULE_LABEL_COLORS = {
 };
 
 let allItems = [];
+let noteItems = [];
+let researchItems = [];
 let currentLabel = '';
 let projectId = '';
 let statusFieldId = '';
+let dueDateFieldId = '';
 let selectedItem = null;
-let currentPage = 'today'; // 'today' | 'board'
+let selectedKind = 'task'; // 'task' | 'note' | 'research'
+let originalBody = '';
+let currentPage = 'board'; // 'board' | 'note' | 'research'
+let noteStatusOptions = []; // [{id, name}]
+let researchStatusOptions = [];
+let noteProjectId = '';
+let researchProjectId = '';
+let noteStatusFieldId = '';
+let researchStatusFieldId = '';
 
 // ── 起動処理 ──
 const pat = localStorage.getItem('gh_pat');
@@ -414,34 +722,45 @@ function showMain(token) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-screen').style.display = 'block';
   document.getElementById('bottom-nav').classList.add('visible');
-  switchPage('today');
-  fetchTodaySchedule(token);
-  fetchTomorrowTasks(token);
+  document.getElementById('add-fab').classList.add('visible');
+  switchPage('board');
   fetchData(token);
+  fetchProject(token, 2, 'note');
+  fetchProject(token, 3, 'research');
 }
 
 // ── ページ切り替え ──
 function switchPage(page) {
   currentPage = page;
 
-  const todayView   = document.getElementById('today-view');
-  const board       = document.getElementById('board');
-  const filterTabs  = document.getElementById('filter-tabs');
-  const logoutBtn   = document.getElementById('logout-btn');
+  const noteView     = document.getElementById('note-view');
+  const researchView = document.getElementById('research-view');
+  const board        = document.getElementById('board');
+  const filterTabs   = document.getElementById('filter-tabs');
+  const logoutBtn    = document.getElementById('logout-btn');
 
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`nav-${page}`).classList.add('active');
 
-  if (page === 'today') {
-    todayView.style.display  = 'block';
-    board.style.display      = 'none';
+  noteView.style.display     = 'none';
+  researchView.style.display = 'none';
+  board.style.display        = 'none';
+
+  if (page === 'note') {
+    noteView.style.display   = 'block';
     filterTabs.style.display = 'none';
     logoutBtn.style.display  = 'none';
+    renderProjectBoard('note', noteItems, noteStatusOptions, document.getElementById('note-view'));
+  } else if (page === 'research') {
+    researchView.style.display = 'block';
+    filterTabs.style.display   = 'none';
+    logoutBtn.style.display    = 'none';
+    renderProjectBoard('research', researchItems, researchStatusOptions, document.getElementById('research-view'));
   } else {
-    todayView.style.display  = 'none';
     board.style.display      = 'flex';
     filterTabs.style.display = 'flex';
     logoutBtn.style.display  = 'block';
+    renderBoard();
   }
 }
 
@@ -631,7 +950,7 @@ function renderTimeline(data) {
   });
 }
 
-// ── ステータス更新（サイレント・今日ビュー用） ──
+// ── ステータス更新（サイレント） ──
 async function updateStatusSilent(item, newOptId) {
   const token = localStorage.getItem('gh_pat');
   if (!token || !projectId || !statusFieldId) return false;
@@ -652,9 +971,16 @@ async function updateStatusSilent(item, newOptId) {
     });
     const data = await res.json();
     if (!data.errors) {
-      // ローカルのallItemsも更新してボードに即反映
+      // ローカルのallItemsも更新（Status fieldValueが無ければ追加）
       const fv = item.fieldValues.nodes.find(f => f.field?.name === 'Status');
-      if (fv) fv.optionId = newOptId;
+      if (fv) {
+        fv.optionId = newOptId;
+      } else {
+        item.fieldValues.nodes.push({
+          optionId: newOptId,
+          field: { name: 'Status' }
+        });
+      }
       return true;
     }
     return false;
@@ -681,6 +1007,7 @@ async function fetchData(token) {
         fields(first: 20) {
           nodes {
             ... on ProjectV2SingleSelectField { id name }
+            ... on ProjectV2Field { id name dataType }
           }
         }
         items(first: 100) {
@@ -688,7 +1015,7 @@ async function fetchData(token) {
             id
             content {
               ... on Issue {
-                title number url
+                id title number url body
                 labels(first: 5) { nodes { name color } }
               }
             }
@@ -697,6 +1024,10 @@ async function fetchData(token) {
                 ... on ProjectV2ItemFieldSingleSelectValue {
                   optionId
                   field { ... on ProjectV2SingleSelectField { name } }
+                }
+                ... on ProjectV2ItemFieldDateValue {
+                  date
+                  field { ... on ProjectV2FieldCommon { name } }
                 }
               }
             }
@@ -721,8 +1052,11 @@ async function fetchData(token) {
     projectId = pj.id;
     const statusField = pj.fields.nodes.find(f => f.name === 'Status');
     if (statusField) statusFieldId = statusField.id;
+    const dueField = pj.fields.nodes.find(f => f.name === 'Due Date');
+    if (dueField) dueDateFieldId = dueField.id;
     allItems = pj.items.nodes.filter(n => n.content?.title);
     if (currentPage === 'board') renderBoard();
+    else if (currentPage === 'tasks') renderTasks();
     else { document.getElementById('loading').style.display = 'none'; }
     return true;
   } catch (e) {
@@ -731,7 +1065,7 @@ async function fetchData(token) {
   }
 }
 
-// ── ボード描画 ──
+// ── ボード描画（タスク用・チェックボックス + 期限ラベル付き） ──
 function renderBoard() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('board').style.display = 'flex';
@@ -748,11 +1082,20 @@ function renderBoard() {
     if (byStatus[optId] !== undefined) byStatus[optId].push(item);
   });
 
+  // 各カラムを Due Date 昇順でソート
+  Object.keys(byStatus).forEach(k => {
+    byStatus[k].sort((a, b) => {
+      const da = a.fieldValues.nodes.find(fv => fv.field?.name === 'Due Date')?.date || '9999';
+      const db = b.fieldValues.nodes.find(fv => fv.field?.name === 'Due Date')?.date || '9999';
+      return da.localeCompare(db);
+    });
+  });
+
   const board = document.getElementById('board');
   board.innerHTML = '';
 
   COLUMNS.forEach(col => {
-    const items = byStatus[col.id] || [];
+    const colItems = byStatus[col.id] || [];
     const colEl = document.createElement('div');
     colEl.className = 'column';
     colEl.innerHTML = `
@@ -761,53 +1104,488 @@ function renderBoard() {
           <div class="col-dot" style="background:${col.dot}"></div>
           ${col.name}
         </div>
-        <span class="col-count">${items.length}</span>
+        <span class="col-count">${colItems.length}</span>
       </div>
-      <div class="col-items" id="col-${col.id}"></div>`;
+      <div class="col-items" data-status-id="${col.id}" data-kind="task"></div>`;
     board.appendChild(colEl);
 
-    const colItems = colEl.querySelector(`#col-${col.id}`);
-    if (items.length === 0) {
-      colItems.innerHTML = '<div class="col-empty">なし</div>';
+    const itemsEl = colEl.querySelector('.col-items');
+    if (colItems.length === 0) {
+      itemsEl.innerHTML = '<div class="col-empty">なし</div>';
     } else {
-      items.forEach(item => {
-        const labels = item.content.labels?.nodes || [];
-        const labelHtml = labels.map(l => {
-          const s = LABEL_COLORS[l.name]
-            ? `background:${LABEL_COLORS[l.name].bg};color:${LABEL_COLORS[l.name].color}`
-            : `background:rgba(255,255,255,.1);color:#999`;
-          return `<span class="item-label" style="${s}">${l.name}</span>`;
-        }).join('');
-        const currentOptId = item.fieldValues.nodes.find(fv => fv.field?.name === 'Status')?.optionId || '192c46ec';
-        const card = document.createElement('div');
-        card.className = 'item-card';
-        card.innerHTML = `
-          <div class="item-title">${item.content.title}</div>
-          <div class="item-meta">
-            <span class="item-num">#${item.content.number}</span>
-            ${labelHtml}
-          </div>`;
-        card.addEventListener('click', () => openSheet(item, currentOptId));
-        colItems.appendChild(card);
+      colItems.forEach(item => {
+        const card = renderItemCard(item, { showCheck: col.id !== 'b43841e5', showDue: true });
+        // チェックボックス → Done
+        const check = card.querySelector('.item-check');
+        if (check) {
+          check.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            check.innerHTML = '<div class="spinner"></div>';
+            check.classList.add('checked');
+            const ok = await updateStatusSilent(item, 'b43841e5');
+            if (ok) {
+              card.classList.add('completing');
+              setTimeout(() => renderBoard(), 300);
+            } else {
+              check.innerHTML = '<span class="item-check-mark">✓</span>';
+              check.classList.remove('checked');
+              alert('完了処理失敗');
+            }
+          });
+        }
+        // タイトル部分タップ → ボトムシート
+        card.addEventListener('click', e => {
+          if (e.target.closest('.item-check')) return;
+          const currentOptId = item.fieldValues.nodes.find(fv => fv.field?.name === 'Status')?.optionId || '192c46ec';
+          openSheet(item, currentOptId);
+        });
+        itemsEl.appendChild(card);
       });
     }
+    setupSortable(itemsEl, 'task');
+  });
+}
+
+// ── ネタ帖 / リサーチ取得 ──
+async function fetchProject(token, projectNumber, kind) {
+  const query = `{
+    user(login: "nagisa-dev") {
+      projectV2(number: ${projectNumber}) {
+        id
+        fields(first: 20) {
+          nodes {
+            ... on ProjectV2SingleSelectField {
+              id name
+              options { id name }
+            }
+          }
+        }
+        items(first: 100) {
+          nodes {
+            id
+            content {
+              ... on Issue {
+                id title number url body
+                labels(first: 5) { nodes { name color } }
+              }
+            }
+            fieldValues(first: 10) {
+              nodes {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name optionId
+                  field { ... on ProjectV2SingleSelectField { name } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }`;
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    const data = await res.json();
+    if (data.errors || !data.data?.user?.projectV2) return;
+    const pj = data.data.user.projectV2;
+    const statusField = pj.fields.nodes.find(f => f.name === 'Status');
+    const statusOptions = statusField?.options || [];
+    const items = pj.items.nodes.filter(n => n.content?.title);
+    if (kind === 'note') {
+      noteItems = items;
+      noteStatusOptions = statusOptions;
+      noteProjectId = pj.id;
+      noteStatusFieldId = statusField?.id || '';
+    } else if (kind === 'research') {
+      researchItems = items;
+      researchStatusOptions = statusOptions;
+      researchProjectId = pj.id;
+      researchStatusFieldId = statusField?.id || '';
+    }
+    if (currentPage === kind) {
+      renderProjectBoard(kind, items, statusOptions, document.getElementById(`${kind}-view`));
+    }
+  } catch (e) { /* silent */ }
+}
+
+// ── プロジェクトボード描画（ネタ帖 / リサーチ用・ボード形式） ──
+function renderProjectBoard(kind, items, statusOptions, container) {
+  if (!container) return;
+  container.style.padding = '16px';
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.style.gap = '16px';
+  container.innerHTML = '';
+
+  // ステータス別グループ
+  const byStatus = {};
+  statusOptions.forEach(opt => byStatus[opt.id] = []);
+  items.forEach(item => {
+    const sf = item.fieldValues.nodes.find(f => f.field?.name === 'Status');
+    const optId = sf?.optionId;
+    if (optId && byStatus[optId] !== undefined) byStatus[optId].push(item);
+  });
+
+  statusOptions.forEach(opt => {
+    const colItems = byStatus[opt.id] || [];
+    const colEl = document.createElement('div');
+    colEl.className = 'column';
+    colEl.innerHTML = `
+      <div class="col-header">
+        <div class="col-title">
+          <div class="col-dot" style="background:#888"></div>
+          ${opt.name}
+        </div>
+        <span class="col-count">${colItems.length}</span>
+      </div>
+      <div class="col-items" data-status-id="${opt.id}" data-kind="${kind}"></div>`;
+    container.appendChild(colEl);
+
+    const itemsEl = colEl.querySelector('.col-items');
+    if (colItems.length === 0) {
+      itemsEl.innerHTML = '<div class="col-empty">なし</div>';
+    } else {
+      colItems.forEach(item => {
+        const card = renderItemCard(item, { showCheck: false, showDue: false });
+        card.addEventListener('click', e => {
+          if (e.target.closest('.item-check')) return;
+          openSheet(item, opt.id, kind);
+        });
+        itemsEl.appendChild(card);
+      });
+    }
+    setupSortable(itemsEl, kind);
+  });
+}
+
+// ── アイテムカード描画（共通） ──
+function renderItemCard(item, opts = {}) {
+  const { showCheck = false, showDue = false } = opts;
+  const labels = item.content.labels?.nodes || [];
+  const labelHtml = labels.filter(l => l.name.startsWith('domain:')).map(l => {
+    const c = LABEL_COLORS[l.name];
+    const style = c ? `background:${c.bg};color:${c.color}` : `background:rgba(255,255,255,.1);color:#999`;
+    return `<span class="item-label" style="${style}">${l.name.replace('domain:', '')}</span>`;
+  }).join('');
+
+  let dueHtml = '';
+  if (showDue) {
+    const dueFv = item.fieldValues.nodes.find(f => f.field?.name === 'Due Date');
+    if (dueFv?.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(dueFv.date + 'T00:00:00');
+      const diff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+      let cls = '', label = '';
+      if (diff < 0) { cls = 'overdue'; label = `${-diff}日超過`; }
+      else if (diff === 0) { cls = 'today'; label = '今日'; }
+      else if (diff === 1) { label = '明日'; }
+      else { label = `あと${diff}日`; }
+      dueHtml = `<span class="item-due ${cls}">${label}</span>`;
+    }
+  }
+
+  const card = document.createElement('div');
+  card.className = 'item-card';
+  card.dataset.itemId = item.id;
+  card.dataset.issue = item.content.number;
+  card.innerHTML = `
+    ${showCheck ? `<div class="item-check" data-item-id="${item.id}"><span class="item-check-mark">✓</span></div>` : ''}
+    <div class="item-body">
+      <div class="item-title">${item.content.title}</div>
+      <div class="item-meta">
+        <span class="item-num">#${item.content.number}</span>
+        ${dueHtml}
+        ${labelHtml}
+      </div>
+    </div>`;
+  return card;
+}
+
+// ── SortableJS（ドラッグ&ドロップ） ──
+function setupSortable(colEl, kind) {
+  if (typeof Sortable === 'undefined') return;
+  Sortable.create(colEl, {
+    group: `${kind}-board`,
+    animation: 180,
+    delay: 200,
+    delayOnTouchOnly: true,
+    touchStartThreshold: 5,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'dragging',
+    onEnd: async (evt) => {
+      const itemId = evt.item.dataset.itemId;
+      const newColEl = evt.to;
+      const newOptId = newColEl.dataset.statusId;
+      const dragKind = newColEl.dataset.kind;
+      if (!itemId || !newOptId) return;
+
+      let projId = '', fieldId = '', sourceItems = [];
+      if (dragKind === 'note')      { projId = noteProjectId;     fieldId = noteStatusFieldId;     sourceItems = noteItems; }
+      else if (dragKind === 'research') { projId = researchProjectId; fieldId = researchStatusFieldId; sourceItems = researchItems; }
+      else                          { projId = projectId;          fieldId = statusFieldId;          sourceItems = allItems; }
+
+      const item = sourceItems.find(it => it.id === itemId);
+      if (!item) return;
+      const ok = await updateProjectItemStatus(projId, fieldId, item, newOptId);
+      if (!ok) {
+        // 失敗時は元の場所に戻す
+        evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex] || null);
+        alert('ステータス更新失敗');
+      }
+    },
+  });
+}
+
+// ── 汎用ステータス更新（ドラッグ用） ──
+async function updateProjectItemStatus(pid, fid, item, newOptId) {
+  const token = localStorage.getItem('gh_pat');
+  if (!token || !pid || !fid) return false;
+  const mutation = `
+    mutation {
+      updateProjectV2ItemFieldValue(input: {
+        projectId: "${pid}"
+        itemId: "${item.id}"
+        fieldId: "${fid}"
+        value: { singleSelectOptionId: "${newOptId}" }
+      }) { projectV2Item { id } }
+    }`;
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mutation }),
+    });
+    const data = await res.json();
+    if (!data.errors) {
+      const fv = item.fieldValues.nodes.find(f => f.field?.name === 'Status');
+      if (fv) fv.optionId = newOptId;
+      return true;
+    }
+    return false;
+  } catch { return false; }
+}
+
+// ── リマインダービュー（Tasks） ──
+function getDueDate(item) {
+  const fv = item.fieldValues.nodes.find(f => f.field?.name === 'Due Date');
+  return fv?.date || null;
+}
+
+function getStatusOptId(item) {
+  const fv = item.fieldValues.nodes.find(f => f.field?.name === 'Status');
+  return fv?.optionId || '192c46ec';
+}
+
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function classifyByDue(items) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = localDateStr(today);
+
+  const weekEnd = new Date(today);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndStr = localDateStr(weekEnd);
+
+  const overdue   = [];
+  const todayList = [];
+  const week      = [];
+  const later     = [];
+  const noDue     = [];
+
+  items.forEach(item => {
+    const due = getDueDate(item);
+    if (!due) {
+      noDue.push(item);
+    } else if (due < todayStr) {
+      overdue.push(item);
+    } else if (due === todayStr) {
+      todayList.push(item);
+    } else if (due <= weekEndStr) {
+      week.push(item);
+    } else {
+      later.push(item);
+    }
+  });
+
+  // Due Date順にソート（昇順）
+  const sortByDue = (a, b) => (getDueDate(a) || '9999').localeCompare(getDueDate(b) || '9999');
+  overdue.sort(sortByDue);
+  todayList.sort(sortByDue);
+  week.sort(sortByDue);
+  later.sort(sortByDue);
+
+  return { overdue, todayList, week, later, noDue };
+}
+
+function formatDueLabel(due) {
+  if (!due) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDate = new Date(due + 'T00:00:00');
+  const diff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+
+  if (diff < 0) return `${-diff}日超過`;
+  if (diff === 0) return '今日';
+  if (diff === 1) return '明日';
+  return `あと${diff}日`;
+}
+
+function renderTasks() {
+  const view = document.getElementById('tasks-view');
+
+  // ドメインフィルタ + Done以外のタスクのみ
+  const filtered = allItems.filter(item => {
+    if (getStatusOptId(item) === DONE_OPTION_ID) return false;
+    if (currentLabel) {
+      const labels = item.content.labels?.nodes || [];
+      if (!labels.some(l => l.name === currentLabel)) return false;
+    }
+    return true;
+  });
+
+  const { overdue, todayList, week, later, noDue } = classifyByDue(filtered);
+
+  let html = '';
+
+  const renderSection = (title, items, headerClass = '') => {
+    if (items.length === 0) return '';
+    let s = `<div class="tasks-section">
+      <div class="tasks-section-header ${headerClass}">
+        ${title}
+        <span class="tasks-section-count">${items.length}</span>
+      </div>
+      <div class="task-list">`;
+    items.forEach(item => {
+      const due = getDueDate(item);
+      const dueLabel = formatDueLabel(due);
+      const dueClass = headerClass === 'overdue' ? 'overdue' : (headerClass === 'today' ? 'today' : '');
+      const labels = item.content.labels?.nodes || [];
+      const labelHtml = labels.filter(l => l.name.startsWith('domain:')).map(l => {
+        const c = LABEL_COLORS[l.name];
+        const style = c ? `background:${c.bg};color:${c.color}` : `background:rgba(255,255,255,.1);color:#999`;
+        return `<span class="task-label" style="${style}">${l.name.replace('domain:', '')}</span>`;
+      }).join('');
+      s += `<div class="task-item" data-item-id="${item.id}" data-issue="${item.content.number}">
+        <div class="task-check" data-item-id="${item.id}">
+          <span class="task-check-mark">✓</span>
+        </div>
+        <div class="task-body">
+          <div class="task-title">${item.content.title}</div>
+          <div class="task-meta">
+            <span class="task-num">#${item.content.number}</span>
+            ${dueLabel ? `<span class="task-due ${dueClass}">${dueLabel}</span>` : ''}
+            ${labelHtml}
+          </div>
+        </div>
+      </div>`;
+    });
+    s += '</div></div>';
+    return s;
+  };
+
+  html += renderSection('期限切れ', overdue, 'overdue');
+  html += renderSection('今日',     todayList, 'today');
+  html += renderSection('今週',     week);
+  html += renderSection('それ以降', later);
+  html += renderSection('期限なし', noDue);
+
+  if (!html) {
+    html = '<div class="tasks-empty">タスクなし<br>新しいタスクを追加しよう</div>';
+  }
+
+  view.innerHTML = html;
+
+  // チェックボックスのクリックイベント
+  view.querySelectorAll('.task-check').forEach(check => {
+    check.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const itemId = check.dataset.itemId;
+      const item = allItems.find(it => it.id === itemId);
+      if (!item) return;
+
+      // ローディング表示
+      check.innerHTML = '<div class="spinner"></div>';
+      check.classList.add('checked');
+
+      const ok = await updateStatusSilent(item, DONE_OPTION_ID);
+      if (ok) {
+        // アニメーションで消す
+        const taskItem = check.closest('.task-item');
+        taskItem.classList.add('completing');
+        setTimeout(() => {
+          renderTasks(); // 再描画
+        }, 300);
+      } else {
+        // 失敗 → 元に戻す
+        check.innerHTML = '<span class="task-check-mark">✓</span>';
+        check.classList.remove('checked');
+        alert('完了処理に失敗しました');
+      }
+    });
+  });
+
+  // タスクタイトル部分のクリック → ボトムシート（既存機能流用）
+  view.querySelectorAll('.task-item').forEach(taskEl => {
+    taskEl.addEventListener('click', (e) => {
+      // チェックボックス自身のクリックは除外
+      if (e.target.closest('.task-check')) return;
+      const itemId = taskEl.dataset.itemId;
+      const item = allItems.find(it => it.id === itemId);
+      if (item) openSheet(item, getStatusOptId(item));
+    });
   });
 }
 
 // ── ボトムシート ──
-function openSheet(item, currentOptId) {
+function openSheet(item, currentOptId, kind = 'task') {
   selectedItem = item;
+  selectedKind = kind;
+
   document.getElementById('sheet-title').textContent = item.content.title;
   document.getElementById('sheet-num').textContent = `#${item.content.number}`;
   document.getElementById('sheet-open-btn').onclick = () => window.open(item.content.url, '_blank');
 
+  // 本文セクション
+  originalBody = item.content.body || '';
+  const bodyDisplay = document.getElementById('sheet-body-display');
+  if (originalBody.trim()) {
+    bodyDisplay.textContent = originalBody;
+    bodyDisplay.classList.remove('empty');
+  } else {
+    bodyDisplay.textContent = '(本文なし)';
+    bodyDisplay.classList.add('empty');
+  }
+  exitEditMode();
+
+  // ステータスボタン（kind別）
   const btns = document.getElementById('status-btns');
   btns.innerHTML = '';
-  COLUMNS.forEach(col => {
+  let opts = [];
+  if (kind === 'task') {
+    opts = COLUMNS.map(c => ({ id: c.id, name: c.name, dot: c.dot }));
+  } else if (kind === 'note') {
+    opts = (noteStatusOptions || []).map(o => ({ id: o.id, name: o.name, dot: '#888' }));
+  } else if (kind === 'research') {
+    opts = (researchStatusOptions || []).map(o => ({ id: o.id, name: o.name, dot: '#888' }));
+  }
+  opts.forEach(opt => {
     const btn = document.createElement('button');
-    btn.className = 'status-btn' + (col.id === currentOptId ? ' current' : '');
-    btn.innerHTML = `<div class="status-dot" style="background:${col.dot}"></div>${col.name}`;
-    if (col.id !== currentOptId) btn.addEventListener('click', () => updateStatus(item, col.id));
+    btn.className = 'status-btn' + (opt.id === currentOptId ? ' current' : '');
+    btn.innerHTML = `<div class="status-dot" style="background:${opt.dot}"></div>${opt.name}`;
+    if (opt.id !== currentOptId) {
+      btn.addEventListener('click', () => updateStatusFromSheet(opt.id));
+    }
     btns.appendChild(btn);
   });
 
@@ -818,8 +1596,155 @@ function openSheet(item, currentOptId) {
 function closeSheet() {
   document.getElementById('sheet-overlay').classList.remove('open');
   document.getElementById('bottom-sheet').classList.remove('open');
+  exitEditMode();
 }
 document.getElementById('sheet-overlay').addEventListener('click', closeSheet);
+
+// ── 本文の編集モード切替 ──
+function enterEditMode() {
+  document.getElementById('sheet-body-display').style.display = 'none';
+  document.getElementById('sheet-body-edit-btn').style.display = 'none';
+  const editor = document.getElementById('sheet-body-editor');
+  editor.style.display = 'block';
+  editor.value = originalBody;
+  document.getElementById('sheet-body-save-btn').style.display = 'block';
+  document.getElementById('sheet-body-cancel-btn').style.display = 'block';
+}
+
+function exitEditMode() {
+  document.getElementById('sheet-body-display').style.display = 'block';
+  document.getElementById('sheet-body-edit-btn').style.display = 'block';
+  document.getElementById('sheet-body-editor').style.display = 'none';
+  document.getElementById('sheet-body-save-btn').style.display = 'none';
+  document.getElementById('sheet-body-cancel-btn').style.display = 'none';
+}
+
+// ── 本文の保存（updateIssue mutation） ──
+async function saveBody() {
+  if (!selectedItem) return;
+  const token = localStorage.getItem('gh_pat');
+  if (!token) return;
+  const issueId = selectedItem.content.id;
+  if (!issueId) { alert('Issue IDが取得できていません。再読込してください。'); return; }
+
+  const newBody = document.getElementById('sheet-body-editor').value;
+  const saveBtn = document.getElementById('sheet-body-save-btn');
+  const cancelBtn = document.getElementById('sheet-body-cancel-btn');
+  saveBtn.disabled = true; cancelBtn.disabled = true;
+  saveBtn.textContent = '保存中...';
+
+  const mutation = `mutation { updateIssue(input: { id: "${issueId}", body: ${JSON.stringify(newBody)} }) { issue { id body } } }`;
+
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mutation }),
+    });
+    const data = await res.json();
+    if (data.errors) {
+      alert('保存に失敗しました: ' + (data.errors[0]?.message || '不明なエラー'));
+    } else {
+      selectedItem.content.body = newBody;
+      originalBody = newBody;
+      const display = document.getElementById('sheet-body-display');
+      if (newBody.trim()) { display.textContent = newBody; display.classList.remove('empty'); }
+      else { display.textContent = '(本文なし)'; display.classList.add('empty'); }
+      exitEditMode();
+    }
+  } catch (e) {
+    alert('通信エラー: ' + e.message);
+  } finally {
+    saveBtn.disabled = false; cancelBtn.disabled = false;
+    saveBtn.textContent = '保存';
+  }
+}
+
+// ── ステータス更新（シート内ボタンから） ──
+async function updateStatusFromSheet(newOptId) {
+  if (!selectedItem) return;
+  let pid = '', fid = '';
+  if (selectedKind === 'task') { pid = projectId; fid = statusFieldId; }
+  else if (selectedKind === 'note') { pid = noteProjectId; fid = noteStatusFieldId; }
+  else if (selectedKind === 'research') { pid = researchProjectId; fid = researchStatusFieldId; }
+  if (!pid || !fid) return;
+
+  const sheet = document.getElementById('bottom-sheet');
+  const overlay = document.createElement('div');
+  overlay.className = 'updating-overlay';
+  overlay.innerHTML = '<div class="spinner"></div> 更新中...';
+  sheet.appendChild(overlay);
+
+  const ok = await updateProjectItemStatus(pid, fid, selectedItem, newOptId);
+  if (ok) {
+    overlay.remove();
+    closeSheet();
+    rerenderCurrentPage();
+  } else {
+    overlay.textContent = '更新に失敗しました';
+    setTimeout(() => overlay.remove(), 2000);
+  }
+}
+
+// ── Issue削除（deleteIssue mutation） ──
+async function deleteCurrentIssue() {
+  if (!selectedItem) return;
+  const issueNum = selectedItem.content.number;
+  if (!confirm(`Issue #${issueNum} を完全に削除しますか？\n\nこの操作は元に戻せません。`)) return;
+
+  const token = localStorage.getItem('gh_pat');
+  if (!token) return;
+  const issueId = selectedItem.content.id;
+  if (!issueId) { alert('Issue IDが取得できていません。再読込してください。'); return; }
+
+  const sheet = document.getElementById('bottom-sheet');
+  const overlay = document.createElement('div');
+  overlay.className = 'updating-overlay';
+  overlay.innerHTML = '<div class="spinner"></div> 削除中...';
+  sheet.appendChild(overlay);
+
+  const mutation = `mutation { deleteIssue(input: { issueId: "${issueId}" }) { repository { id } } }`;
+
+  try {
+    const res = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mutation }),
+    });
+    const data = await res.json();
+    if (data.errors) {
+      overlay.textContent = '削除失敗: ' + (data.errors[0]?.message || '不明');
+      setTimeout(() => overlay.remove(), 3000);
+      return;
+    }
+    if (selectedKind === 'task') allItems = allItems.filter(it => it.id !== selectedItem.id);
+    else if (selectedKind === 'note') noteItems = noteItems.filter(it => it.id !== selectedItem.id);
+    else if (selectedKind === 'research') researchItems = researchItems.filter(it => it.id !== selectedItem.id);
+    overlay.remove();
+    closeSheet();
+    rerenderCurrentPage();
+  } catch (e) {
+    overlay.textContent = '通信エラー';
+    setTimeout(() => overlay.remove(), 2000);
+  }
+}
+
+function rerenderCurrentPage() {
+  if (currentPage === 'note') {
+    renderProjectBoard('note', noteItems, noteStatusOptions, document.getElementById('note-view'));
+  } else if (currentPage === 'research') {
+    renderProjectBoard('research', researchItems, researchStatusOptions, document.getElementById('research-view'));
+  } else if (currentPage === 'tasks') {
+    if (typeof renderTasks === 'function') renderTasks();
+  } else {
+    renderBoard();
+  }
+}
+
+document.getElementById('sheet-body-edit-btn').addEventListener('click', enterEditMode);
+document.getElementById('sheet-body-cancel-btn').addEventListener('click', exitEditMode);
+document.getElementById('sheet-body-save-btn').addEventListener('click', saveBody);
+document.getElementById('sheet-delete-btn').addEventListener('click', deleteCurrentIssue);
 
 // ── ステータス更新 ──
 async function updateStatus(item, newOptId) {
@@ -850,6 +1775,7 @@ async function updateStatus(item, newOptId) {
     });
     const data = await res.json();
     if (!data.errors) {
+      overlay.remove();
       const fv = item.fieldValues.nodes.find(f => f.field?.name === 'Status');
       if (fv) fv.optionId = newOptId;
       closeSheet();
@@ -871,15 +1797,170 @@ document.getElementById('filter-tabs').addEventListener('click', e => {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   tab.classList.add('active');
   currentLabel = tab.dataset.label;
-  renderBoard();
+  if (currentPage === 'tasks') renderTasks();
+  else renderBoard();
 });
 
 // ── 更新ボタン ──
 document.getElementById('reload-btn').addEventListener('click', () => {
   const token = localStorage.getItem('gh_pat');
   if (!token) return;
-  if (currentPage === 'today') fetchTodaySchedule(token);
+  if (currentPage === 'note') fetchProject(token, 2, 'note');
+  else if (currentPage === 'research') fetchProject(token, 3, 'research');
   else fetchData(token);
+});
+
+// ── フィルタータブを「すべて」状態でデフォルト表示するよう調整（タスクページのみ） ──
+// switchPage('board') が初期表示なのでフィルタータブも表示される。既存ロジックそのまま。
+
+// ── 追加 FAB ──
+const PROJECT_NUMBERS = { board: 1, note: 2, research: 3 };
+const PROJECT_LABELS  = { board: 'タスク', note: 'ネタ帖', research: 'リサーチ' };
+
+let addSheetState = { domain: null, due: null };
+
+function showAddFab() {
+  document.getElementById('add-fab').classList.add('visible');
+}
+
+function openAddSheet() {
+  const kind = currentPage === 'board' ? 'task' : currentPage; // board==task
+  const isTask = (currentPage === 'board');
+  document.getElementById('add-sheet-title').textContent = `${PROJECT_LABELS[currentPage] || 'アイテム'}を追加`;
+  document.getElementById('add-sheet-sub').textContent   = isTask ? 'タイトル・ドメイン・期限を入力' : 'タイトルとドメインを入力';
+  document.getElementById('add-due-section').style.display = isTask ? 'block' : 'none';
+
+  document.getElementById('add-title').value = '';
+  addSheetState = { domain: null, due: null };
+  document.querySelectorAll('.add-choice-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('sheet-overlay').classList.add('open');
+  document.getElementById('add-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('add-title').focus(), 280);
+}
+
+function closeAddSheet() {
+  document.getElementById('sheet-overlay').classList.remove('open');
+  document.getElementById('add-sheet').classList.remove('open');
+}
+
+// FAB クリック → シート開く
+document.getElementById('add-fab').addEventListener('click', openAddSheet);
+document.getElementById('add-cancel-btn').addEventListener('click', closeAddSheet);
+
+// domain / due ボタン
+document.querySelectorAll('#add-sheet .add-choice-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const isDomain = btn.dataset.domain !== undefined;
+    const group = isDomain ? '[data-domain]' : '[data-due]';
+    document.querySelectorAll(`#add-sheet ${group}`).forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    if (isDomain) addSheetState.domain = btn.dataset.domain;
+    else          addSheetState.due    = btn.dataset.due;
+  });
+});
+
+// 追加実行
+document.getElementById('add-submit-btn').addEventListener('click', async () => {
+  const title = document.getElementById('add-title').value.trim();
+  if (!title) { alert('タイトルを入力してください'); return; }
+  if (!addSheetState.domain) { alert('domainを選んでください'); return; }
+
+  const btn = document.getElementById('add-submit-btn');
+  btn.disabled = true; btn.textContent = '追加中...';
+
+  try {
+    await createIssueForCurrentTab(title, addSheetState.domain, addSheetState.due);
+    closeAddSheet();
+    // 該当ページを再取得
+    const token = localStorage.getItem('gh_pat');
+    if (currentPage === 'note')      fetchProject(token, 2, 'note');
+    else if (currentPage === 'research') fetchProject(token, 3, 'research');
+    else fetchData(token);
+  } catch (e) {
+    alert('追加失敗: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '追加';
+  }
+});
+
+// Issue 作成 + Project追加 + Due Date設定
+async function createIssueForCurrentTab(title, domainJp, dueCode) {
+  const token = localStorage.getItem('gh_pat');
+  if (!token) throw new Error('PAT未設定');
+
+  // 1. Issue 作成（REST API）
+  const labelName = `domain:${domainJp}`;
+  const issueRes = await fetch('https://api.github.com/repos/nagisa-dev/furuta-database/issues', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title, body: '', labels: [labelName] }),
+  });
+  if (!issueRes.ok) throw new Error(`Issue作成失敗 (${issueRes.status})`);
+  const issueData = await issueRes.json();
+  const issueNodeId = issueData.node_id;
+  const issueNumber = issueData.number;
+
+  // 2. 該当 Project を決定
+  let pid = '', isTask = false;
+  if (currentPage === 'note')          pid = noteProjectId;
+  else if (currentPage === 'research') pid = researchProjectId;
+  else { pid = projectId; isTask = true; }
+
+  if (!pid) throw new Error('Project ID未取得');
+
+  // 3. Project に追加
+  const addMutation = `
+    mutation {
+      addProjectV2ItemById(input: { projectId: "${pid}", contentId: "${issueNodeId}" }) {
+        item { id }
+      }
+    }`;
+  const addRes = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: addMutation }),
+  });
+  const addData = await addRes.json();
+  if (addData.errors) throw new Error('Project追加失敗: ' + JSON.stringify(addData.errors));
+  const itemId = addData.data.addProjectV2ItemById.item.id;
+
+  // 4. タスクで期限指定があれば Due Date設定
+  if (isTask && dueCode && dueDateFieldId) {
+    const dueDate = calcDueDateLocal(dueCode);
+    const dueMutation = `
+      mutation {
+        updateProjectV2ItemFieldValue(input: {
+          projectId: "${pid}"
+          itemId: "${itemId}"
+          fieldId: "${dueDateFieldId}"
+          value: { date: "${dueDate}" }
+        }) { projectV2Item { id } }
+      }`;
+    await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: dueMutation }),
+    });
+  }
+
+  return { issueNumber, itemId };
+}
+
+function calcDueDateLocal(due) {
+  const offsets = { today: 0, '1week': 7, '2week': 14, '1month': 30, someday: 365 };
+  const d = new Date();
+  d.setDate(d.getDate() + (offsets[due] || 0));
+  return localDateStr(d);
+}
+
+// オーバーレイタップで閉じる（追加シート用）
+document.getElementById('sheet-overlay').addEventListener('click', () => {
+  closeAddSheet();
+  closeSheet();
 });
 
 // ── ログアウト ──

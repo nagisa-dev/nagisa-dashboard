@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nagisa dashboard — 仕組み図解</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    color: #f0f0f0;
+    font-family: -apple-system, 'Hiragino Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+
+  .diagram {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #666;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  /* ── ノード ── */
+  .node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .node-box {
+    background: #1a1a1a;
+    border: 1.5px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    padding: 14px 24px;
+    text-align: center;
+    min-width: 140px;
+  }
+  .node-icon { font-size: 28px; margin-bottom: 4px; }
+  .node-label { font-size: 13px; font-weight: 600; }
+  .node-sub { font-size: 11px; color: #666; margin-top: 2px; }
+
+  /* ── 矢印 ── */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 2px 0;
+  }
+  .arrow-line {
+    width: 2px;
+    height: 28px;
+    background: linear-gradient(to bottom, #22c55e, #22c55e88);
+  }
+  .arrow-head {
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #22c55e88;
+  }
+  .arrow-label {
+    font-size: 11px;
+    color: #22c55e;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+
+  /* ── Step1：人 → Claude ── */
+  .step1 {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 4px;
+  }
+  .speech {
+    background: #22c55e;
+    color: #000;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 20px;
+    position: relative;
+  }
+  .speech::after {
+    content: '';
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 8px solid #22c55e;
+  }
+  .person { font-size: 32px; }
+
+  /* ── Step2：Claude + 2つのソース ── */
+  .step2 {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin: 8px 0;
+  }
+  .source-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  .source-box {
+    background: #1a1a1a;
+    border: 1.5px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .source-box .ico { font-size: 18px; }
+  .connector {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .h-line {
+    height: 2px;
+    width: 24px;
+    background: rgba(255,255,255,.15);
+  }
+
+  /* ── JSON ── */
+  .json-box {
+    background: #111;
+    border: 1.5px solid #22c55e44;
+    border-radius: 10px;
+    padding: 12px 20px;
+    text-align: center;
+  }
+  .json-box .filename {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: monospace;
+    color: #22c55e;
+  }
+  .json-box .where { font-size: 11px; color: #444; margin-top: 3px; }
+
+  /* ── 分岐 ── */
+  .branch {
+    display: flex;
+    align-items: flex-start;
+    gap: 40px;
+    margin-top: 4px;
+  }
+  .branch-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* iPhoneモックアップ */
+  .iphone {
+    width: 140px;
+    background: #111;
+    border: 2px solid #333;
+    border-radius: 24px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+  }
+  .iphone::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+    margin: 0 auto 6px;
+  }
+  .iphone-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f0f0f0;
+    padding: 0 4px;
+  }
+  .iphone-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 6px;
+    background: #1a1a1a;
+    border-radius: 6px;
+    font-size: 10px;
+    color: #ccc;
+  }
+  .iphone-row .time { color: #666; font-family: monospace; flex-shrink: 0; }
+  .iphone-row .chk { width: 12px; height: 12px; border: 1.5px solid #444; border-radius: 3px; flex-shrink: 0; }
+  .iphone-row .chk.done { background: #22c55e; border-color: #22c55e; }
+  .iphone-footer {
+    font-size: 10px;
+    color: #22c55e;
+    text-align: right;
+    padding: 0 4px;
+  }
+
+  .branch-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f0f0f0;
+    text-align: center;
+  }
+  .branch-sub {
+    font-size: 11px;
+    color: #555;
+    text-align: center;
+    margin-top: -4px;
+  }
+
+  /* ── 合流矢印 ── */
+  .merge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .merge-lines {
+    display: flex;
+    gap: 120px;
+    margin-bottom: -1px;
+  }
+  .merge-line {
+    width: 2px;
+    height: 20px;
+    background: rgba(255,255,255,.15);
+  }
+  .merge-h {
+    width: 122px;
+    height: 2px;
+    background: rgba(255,255,255,.15);
+    margin-top: -1px;
+  }
+
+  /* GitHub Projects */
+  .projects-box {
+    background: #1a1a1a;
+    border: 1.5px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 4px;
+  }
+  .kanban-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+  .kanban-col-title {
+    font-size: 10px;
+    color: #666;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .kanban-card {
+    width: 70px;
+    height: 22px;
+    border-radius: 4px;
+    background: #111;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .kanban-card.done-card { border-color: #22c55e44; background: rgba(34,197,94,.08); }
+
+  .final-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f0f0f0;
+    text-align: center;
+    margin-top: 6px;
+  }
+  .final-sub {
+    font-size: 11px;
+    color: #555;
+    text-align: center;
+  }
+
+  /* badge */
+  .badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .badge-green { background: rgba(34,197,94,.15); color: #22c55e; }
+  .badge-blue  { background: rgba(59,130,246,.15); color: #93c5fd; }
+</style>
+</head>
+<body>
+<div class="diagram">
+  <h1>nagisa dashboard — 仕組み</h1>
+
+  <!-- Step1: 人 → Claude Code -->
+  <div class="step1">
+    <div class="person">🧑</div>
+    <div class="speech">「おはよう」</div>
+    <div style="font-size:20px;color:#444;">→</div>
+    <div class="node-box" style="min-width:120px;">
+      <div class="node-icon">🤖</div>
+      <div class="node-label">Claude Code</div>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+  <!-- Step2: 2つのソースから取得 -->
+  <div class="step2">
+    <div class="source-box"><span class="ico">📅</span>Googleカレンダー</div>
+    <div style="font-size:11px;color:#444;">+</div>
+    <div class="source-box"><span class="ico">🐱</span>GitHub Issues</div>
+  </div>
+
+  <div class="arrow">
+    <div class="arrow-line"></div>
+    <div class="arrow-head"></div>
+    <div class="arrow-label">工程表を生成して保存</div>
+  </div>
+
+  <!-- JSON -->
+  <div class="json-box">
+    <div class="filename">today-schedule.json</div>
+    <div class="where">GitHub リポジトリに保存</div>
+  </div>
+
+  <!-- 分岐矢印 -->
+  <div style="display:flex;gap:120px;margin-top:8px;">
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+  </div>
+
+  <!-- 2つのiPhone -->
+  <div class="branch">
+    <div class="branch-item">
+      <div class="iphone">
+        <div class="iphone-title">☀️ 今日のタスク</div>
+        <div class="iphone-row">
+          <div class="chk done"></div>
+          <span class="time">12:00</span>
+          <span>ランチ</span>
+        </div>
+        <div class="iphone-row">
+          <div class="chk"></div>
+          <span class="time">13:00</span>
+          <span>レンタカー</span>
+        </div>
+        <div class="iphone-row">
+          <div class="chk"></div>
+          <span class="time">14:00</span>
+          <span>花束注文</span>
+        </div>
+        <div class="iphone-row">
+          <div class="chk"></div>
+          <span class="time">15:00</span>
+          <span>UMIBE連絡</span>
+        </div>
+        <div class="iphone-footer">残り 3 件</div>
+      </div>
+      <div class="branch-label">ウィジェット</div>
+      <div class="branch-sub">アプリ不要・常時表示</div>
+      <span class="badge badge-blue">見る専用</span>
+    </div>
+
+    <div class="branch-item">
+      <div class="iphone">
+        <div class="iphone-title" style="display:flex;gap:6px;align-items:center;">
+          <span>☀️今日</span>
+          <span style="color:#444;font-size:9px;">｜</span>
+          <span style="color:#555;">📋ボード</span>
+        </div>
+        <div class="iphone-row">
+          <div class="chk done"></div>
+          <span class="time">12:00</span>
+          <span>ランチ</span>
+        </div>
+        <div class="iphone-row" style="border:1px solid #22c55e44;background:rgba(34,197,94,.05);">
+          <div class="chk"></div>
+          <span class="time">13:00</span>
+          <span>レンタカー</span>
+        </div>
+        <div class="iphone-row">
+          <div class="chk"></div>
+          <span class="time">14:00</span>
+          <span>花束注文</span>
+        </div>
+        <div style="font-size:9px;color:#22c55e;padding:2px 6px;">↑ タップでDone反映</div>
+      </div>
+      <div class="branch-label">nagisa-dashboard</div>
+      <div class="branch-sub">チェックで操作</div>
+      <span class="badge badge-green">操作できる</span>
+    </div>
+  </div>
+
+  <!-- 合流 -->
+  <div class="merge" style="margin-top:12px;">
+    <div style="display:flex;gap:116px;">
+      <div style="width:2px;height:20px;background:rgba(255,255,255,.12);"></div>
+      <div style="width:2px;height:20px;background:rgba(255,255,255,.12);"></div>
+    </div>
+    <div style="display:flex;align-items:center;">
+      <div style="width:60px;height:2px;background:rgba(255,255,255,.12);"></div>
+      <div style="width:2px;height:16px;background:rgba(255,255,255,.12);"></div>
+      <div style="width:60px;height:2px;background:rgba(255,255,255,.12);"></div>
+    </div>
+    <div class="arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+  </div>
+
+  <!-- GitHub Projects -->
+  <div class="projects-box">
+    <div class="kanban-col">
+      <div class="kanban-col-title">新着</div>
+      <div class="kanban-card"></div>
+      <div class="kanban-card"></div>
+    </div>
+    <div class="kanban-col">
+      <div class="kanban-col-title">今週</div>
+      <div class="kanban-card"></div>
+      <div class="kanban-card"></div>
+      <div class="kanban-card"></div>
+    </div>
+    <div class="kanban-col">
+      <div class="kanban-col-title">作業中</div>
+      <div class="kanban-card"></div>
+    </div>
+    <div class="kanban-col">
+      <div class="kanban-col-title" style="color:#22c55e;">Done ✓</div>
+      <div class="kanban-card done-card"></div>
+      <div class="kanban-card done-card"></div>
+    </div>
+  </div>
+  <div class="final-label" style="margin-top:10px;">GitHub Projects ボード</div>
+  <div class="final-sub">チェックすると自動でDoneに移動</div>
+
+</div>
+</body>
+</html>
