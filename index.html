@@ -633,6 +633,9 @@
   <!-- リサーチビュー -->
   <div id="research-view" style="display:none;"></div>
 
+  <!-- SNSネタビュー -->
+  <div id="sns-view" style="display:none;"></div>
+
   <button class="logout-btn" id="logout-btn">ログアウト（トークンを削除）</button>
 </div>
 
@@ -644,11 +647,15 @@
   </button>
   <button class="nav-btn" id="nav-note" data-page="note">
     <span class="nav-icon">📝</span>
-    <span class="nav-label">ネタ帖</span>
+    <span class="nav-label">note</span>
   </button>
   <button class="nav-btn" id="nav-research" data-page="research">
     <span class="nav-icon">🔍</span>
     <span class="nav-label">リサーチ</span>
+  </button>
+  <button class="nav-btn" id="nav-sns" data-page="sns">
+    <span class="nav-icon">💬</span>
+    <span class="nav-label">SNSネタ</span>
   </button>
 </nav>
 
@@ -763,13 +770,17 @@ let dueDateFieldId = '';
 let selectedItem = null;
 let selectedKind = 'task'; // 'task' | 'note' | 'research'
 let originalBody = '';
-let currentPage = 'board'; // 'board' | 'note' | 'research'
+let currentPage = 'board'; // 'board' | 'note' | 'research' | 'sns'
 let noteStatusOptions = []; // [{id, name}]
 let researchStatusOptions = [];
+let snsStatusOptions = [];
 let noteProjectId = '';
 let researchProjectId = '';
+let snsProjectIdState = '';
 let noteStatusFieldId = '';
 let researchStatusFieldId = '';
+let snsStatusFieldId = '';
+let snsItems = [];
 
 // ── 起動処理 ──
 const pat = localStorage.getItem('gh_pat');
@@ -794,6 +805,7 @@ function showMain(token) {
   fetchData(token);
   fetchProject(token, 2, 'note');
   fetchProject(token, 3, 'research');
+  fetchProject(token, 4, 'sns');
 }
 
 // ── ページ切り替え ──
@@ -802,31 +814,43 @@ function switchPage(page) {
 
   const noteView     = document.getElementById('note-view');
   const researchView = document.getElementById('research-view');
+  const snsView      = document.getElementById('sns-view');
   const board        = document.getElementById('board');
   const filterTabs   = document.getElementById('filter-tabs');
   const logoutBtn    = document.getElementById('logout-btn');
+  const addFab       = document.getElementById('add-fab');
 
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`nav-${page}`).classList.add('active');
 
   noteView.style.display     = 'none';
   researchView.style.display = 'none';
+  snsView.style.display      = 'none';
   board.style.display        = 'none';
 
   if (page === 'note') {
     noteView.style.display   = 'block';
     filterTabs.style.display = 'none';
     logoutBtn.style.display  = 'none';
+    addFab.classList.add('visible');
     renderProjectBoard('note', noteItems, noteStatusOptions, document.getElementById('note-view'));
   } else if (page === 'research') {
     researchView.style.display = 'block';
     filterTabs.style.display   = 'none';
     logoutBtn.style.display    = 'none';
+    addFab.classList.add('visible');
     renderProjectBoard('research', researchItems, researchStatusOptions, document.getElementById('research-view'));
+  } else if (page === 'sns') {
+    snsView.style.display      = 'block';
+    filterTabs.style.display   = 'none';
+    logoutBtn.style.display    = 'none';
+    addFab.classList.remove('visible'); // SNSページでは「+」非表示（紫📝で追加）
+    renderProjectBoard('sns', snsItems, snsStatusOptions, document.getElementById('sns-view'));
   } else {
     board.style.display      = 'flex';
     filterTabs.style.display = 'flex';
     logoutBtn.style.display  = 'block';
+    addFab.classList.add('visible');
     renderBoard();
   }
 }
@@ -1271,6 +1295,11 @@ async function fetchProject(token, projectNumber, kind) {
       researchStatusOptions = statusOptions;
       researchProjectId = pj.id;
       researchStatusFieldId = statusField?.id || '';
+    } else if (kind === 'sns') {
+      snsItems = items;
+      snsStatusOptions = statusOptions;
+      snsProjectIdState = pj.id;
+      snsStatusFieldId = statusField?.id || '';
     }
     if (currentPage === kind) {
       renderProjectBoard(kind, items, statusOptions, document.getElementById(`${kind}-view`));
@@ -1802,6 +1831,8 @@ function rerenderCurrentPage() {
     renderProjectBoard('note', noteItems, noteStatusOptions, document.getElementById('note-view'));
   } else if (currentPage === 'research') {
     renderProjectBoard('research', researchItems, researchStatusOptions, document.getElementById('research-view'));
+  } else if (currentPage === 'sns') {
+    renderProjectBoard('sns', snsItems, snsStatusOptions, document.getElementById('sns-view'));
   } else if (currentPage === 'tasks') {
     if (typeof renderTasks === 'function') renderTasks();
   } else {
@@ -1875,6 +1906,7 @@ document.getElementById('reload-btn').addEventListener('click', () => {
   if (!token) return;
   if (currentPage === 'note') fetchProject(token, 2, 'note');
   else if (currentPage === 'research') fetchProject(token, 3, 'research');
+  else if (currentPage === 'sns') fetchProject(token, 4, 'sns');
   else fetchData(token);
 });
 
@@ -1943,6 +1975,7 @@ document.getElementById('add-submit-btn').addEventListener('click', async () => 
     const token = localStorage.getItem('gh_pat');
     if (currentPage === 'note')      fetchProject(token, 2, 'note');
     else if (currentPage === 'research') fetchProject(token, 3, 'research');
+    else if (currentPage === 'sns')      fetchProject(token, 4, 'sns');
     else fetchData(token);
   } catch (e) {
     alert('追加失敗: ' + e.message);
