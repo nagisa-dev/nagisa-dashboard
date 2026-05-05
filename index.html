@@ -547,9 +547,9 @@
       border-radius: 10px; font-size: 13px; cursor: pointer;
     }
 
-    /* ── SNSネタ追加 FAB ── */
+    /* ── SNSネタ追加 FAB（SNSネタタブでのみ右端表示） ── */
     .sns-fab {
-      position: fixed; right: 88px; bottom: 88px;
+      position: fixed; right: 20px; bottom: 88px;
       width: 56px; height: 56px;
       border-radius: 50%; border: none;
       background: #6366f1; color: #fff;
@@ -800,7 +800,7 @@ function showMain(token) {
   document.getElementById('main-screen').style.display = 'block';
   document.getElementById('bottom-nav').classList.add('visible');
   document.getElementById('add-fab').classList.add('visible');
-  document.getElementById('sns-fab').classList.add('visible');
+  // 紫📝はswitchPageで制御（sns時のみ表示）
   switchPage('board');
   fetchData(token);
   fetchProject(token, 2, 'note');
@@ -819,6 +819,7 @@ function switchPage(page) {
   const filterTabs   = document.getElementById('filter-tabs');
   const logoutBtn    = document.getElementById('logout-btn');
   const addFab       = document.getElementById('add-fab');
+  const snsFab       = document.getElementById('sns-fab');
 
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`nav-${page}`).classList.add('active');
@@ -833,24 +834,28 @@ function switchPage(page) {
     filterTabs.style.display = 'none';
     logoutBtn.style.display  = 'none';
     addFab.classList.add('visible');
+    snsFab.classList.remove('visible');
     renderProjectBoard('note', noteItems, noteStatusOptions, document.getElementById('note-view'));
   } else if (page === 'research') {
     researchView.style.display = 'block';
     filterTabs.style.display   = 'none';
     logoutBtn.style.display    = 'none';
     addFab.classList.add('visible');
+    snsFab.classList.remove('visible');
     renderProjectBoard('research', researchItems, researchStatusOptions, document.getElementById('research-view'));
   } else if (page === 'sns') {
     snsView.style.display      = 'block';
     filterTabs.style.display   = 'none';
     logoutBtn.style.display    = 'none';
-    addFab.classList.remove('visible'); // SNSページでは「+」非表示（紫📝で追加）
+    addFab.classList.remove('visible'); // SNSページでは「+」非表示
+    snsFab.classList.add('visible');    // 紫📝のみ表示（右端）
     renderProjectBoard('sns', snsItems, snsStatusOptions, document.getElementById('sns-view'));
   } else {
     board.style.display      = 'flex';
     filterTabs.style.display = 'flex';
     logoutBtn.style.display  = 'block';
     addFab.classList.add('visible');
+    snsFab.classList.remove('visible');
     renderBoard();
   }
 }
