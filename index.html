@@ -546,6 +546,48 @@
       background: none; color: var(--muted); border: 1px solid var(--border);
       border-radius: 10px; font-size: 13px; cursor: pointer;
     }
+
+    /* ── SNSネタ追加 FAB ── */
+    .sns-fab {
+      position: fixed; right: 88px; bottom: 88px;
+      width: 56px; height: 56px;
+      border-radius: 50%; border: none;
+      background: #6366f1; color: #fff;
+      font-size: 22px; line-height: 1;
+      box-shadow: 0 6px 16px rgba(0,0,0,.4);
+      cursor: pointer; z-index: 50;
+      display: none;
+      transition: background .2s, transform .2s;
+    }
+    .sns-fab.visible { display: flex; align-items: center; justify-content: center; }
+    .sns-fab:active { transform: scale(.92); }
+    .sns-fab.success { background: #22c55e; }
+
+    /* ── SNSネタ追加シート ── */
+    #sns-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--card); border-radius: 20px 20px 0 0;
+      padding: 20px 16px 32px; z-index: 101;
+      transform: translateY(100%); transition: transform .25s ease;
+      max-height: 85vh; overflow-y: auto;
+    }
+    #sns-sheet.open { transform: translateY(0); }
+    .add-form-textarea {
+      width: 100%; padding: 12px 14px;
+      background: var(--bg); color: var(--text);
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; outline: none; margin-bottom: 14px;
+      font-family: inherit;
+      min-height: 140px; resize: vertical;
+    }
+    .add-form-textarea:focus { border-color: #6366f1; }
+    .sns-submit-btn {
+      width: 100%; padding: 14px; margin-top: 8px;
+      background: #6366f1; color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 600;
+      cursor: pointer;
+    }
+    .sns-submit-btn:disabled { opacity: .5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -612,6 +654,21 @@
 
 <!-- 追加 FAB -->
 <button class="add-fab" id="add-fab">+</button>
+
+<!-- SNSネタ追加 FAB -->
+<button class="sns-fab" id="sns-fab" title="SNSネタを追加">📝</button>
+
+<!-- SNSネタ追加シート -->
+<div id="sns-sheet">
+  <div class="sheet-handle"></div>
+  <div class="add-sheet-title">SNSネタを追加</div>
+  <div class="add-sheet-sub">思ったことを書きなぐる（カテゴリは AI が判別）</div>
+
+  <textarea class="add-form-textarea" id="sns-text" placeholder="例：サウナで整うって本当だったかも"></textarea>
+
+  <button class="sns-submit-btn" id="sns-submit-btn">追加</button>
+  <button class="add-cancel-btn" id="sns-cancel-btn">キャンセル</button>
+</div>
 
 <!-- 追加フォーム（ボトムシート） -->
 <div id="add-sheet">
@@ -725,11 +782,14 @@ function showLogin() {
   document.getElementById('bottom-nav').classList.remove('visible');
 }
 
+const SNS_PROJECT_ID = "PVT_kwHOD-7Epc4BWw8M"; // SNS_ネタ帖 Project (#4)
+
 function showMain(token) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-screen').style.display = 'block';
   document.getElementById('bottom-nav').classList.add('visible');
   document.getElementById('add-fab').classList.add('visible');
+  document.getElementById('sns-fab').classList.add('visible');
   switchPage('board');
   fetchData(token);
   fetchProject(token, 2, 'note');
@@ -2016,8 +2076,86 @@ function calcDueDateLocal(due) {
 // オーバーレイタップで閉じる（追加シート用）
 document.getElementById('sheet-overlay').addEventListener('click', () => {
   closeAddSheet();
+  closeSnsSheet();
   closeSheet();
 });
+
+// ── SNSネタ追加 ──
+function openSnsSheet() {
+  document.getElementById('sns-text').value = '';
+  document.getElementById('sheet-overlay').classList.add('open');
+  document.getElementById('sns-sheet').classList.add('open');
+  setTimeout(() => document.getElementById('sns-text').focus(), 280);
+}
+
+function closeSnsSheet() {
+  document.getElementById('sheet-overlay').classList.remove('open');
+  document.getElementById('sns-sheet').classList.remove('open');
+}
+
+document.getElementById('sns-fab').addEventListener('click', openSnsSheet);
+document.getElementById('sns-cancel-btn').addEventListener('click', closeSnsSheet);
+
+document.getElementById('sns-submit-btn').addEventListener('click', async () => {
+  const text = document.getElementById('sns-text').value.trim();
+  if (!text) { alert('内容を入力してください'); return; }
+
+  const btn = document.getElementById('sns-submit-btn');
+  btn.disabled = true; btn.textContent = '追加中...';
+
+  try {
+    await createSnsIdea(text);
+    closeSnsSheet();
+    // 成功フィードバック
+    const fab = document.getElementById('sns-fab');
+    fab.classList.add('success');
+    fab.textContent = '✓';
+    setTimeout(() => { fab.classList.remove('success'); fab.textContent = '📝'; }, 1500);
+  } catch (e) {
+    alert('追加失敗: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '追加';
+  }
+});
+
+async function createSnsIdea(text) {
+  const token = localStorage.getItem('gh_pat');
+  if (!token) throw new Error('PAT未設定');
+
+  // タイトル：先頭行の40字まで
+  const titleRaw = text.split('\n')[0];
+  const title = titleRaw.length > 40 ? titleRaw.slice(0, 40) + '…' : titleRaw;
+
+  // 1. Issue作成（ラベル sns:idea、本文に全文）
+  const issueRes = await fetch('https://api.github.com/repos/nagisa-dev/furuta-database/issues', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title, body: text, labels: ['sns:idea'] }),
+  });
+  if (!issueRes.ok) throw new Error(`Issue作成失敗 (${issueRes.status})`);
+  const issueData = await issueRes.json();
+
+  // 2. SNS_ネタ帖 ProjectにItem追加
+  const addMutation = `
+    mutation {
+      addProjectV2ItemById(input: { projectId: "${SNS_PROJECT_ID}", contentId: "${issueData.node_id}" }) {
+        item { id }
+      }
+    }`;
+  const addRes = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: addMutation }),
+  });
+  const addData = await addRes.json();
+  if (addData.errors) throw new Error('Project追加失敗: ' + JSON.stringify(addData.errors));
+
+  return { issueNumber: issueData.number };
+}
 
 // ── ログアウト ──
 document.getElementById('logout-btn').addEventListener('click', () => {
